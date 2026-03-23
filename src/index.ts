@@ -25,10 +25,20 @@ try {
   // 3. Mini-servidor HTTP para Health Checks (CRÍTICO para Render/Koyeb/HuggingFace)
   const http = await import('http');
   const port = process.env.PORT || 8080;
-  http.createServer((req, res) => {
+  const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('OpenGravity Agent is ALIVE\n');
-  }).listen(port, () => {
+  });
+
+  server.on('error', (e: any) => {
+    if (e.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Advertencia: El puerto ${port} ya está en uso. El servidor de salud no se inició, pero el bot seguirá funcionando.`);
+    } else {
+      console.error('❌ Error en el servidor de salud:', e);
+    }
+  });
+
+  server.listen(port, () => {
     console.log(`📡 Servidor de salud escuchando en el puerto ${port}`);
   });
   

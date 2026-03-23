@@ -39,9 +39,10 @@ export const synthesizeSpeech = async (text: string, outputFilePath: string): Pr
     await tts.toFile(outputFilePath, text);
     
     console.log(`🔊 Audio neuronal generado con Edge TTS en: ${outputFilePath}`);
-  } catch (error) {
-    console.error('❌ Error en Edge TTS:', error);
-    throw new Error('No se pudo generar el audio de respuesta con la nueva voz.');
+  } catch (error: any) {
+    console.error('❌ Error detallado en Edge TTS:', error.message || error);
+    if (error.stack) console.error(error.stack);
+    throw new Error(`Falla en la síntesis de voz: ${error.message}`);
   }
 };
 
