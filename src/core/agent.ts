@@ -15,6 +15,17 @@ MODO VOZ:
 HERRAMIENTAS:
 - Tienes la habilidad de ejecutar Herramientas Locales. 
 - Si el usuario te pregunta por algo que requiera una herramienta (ej. la hora), ejecútala antes de dar la respuesta final.
+
+HABILIDAD SQL (DBA):
+- Tienes acceso a una base de datos PostgreSQL mediante la herramienta 'execute_psql'.
+- Actúa como un Administrador de Base de Datos (DBA).
+- Si el usuario te pide datos en lenguaje natural:
+  1. Primero inspecciona el esquema usando la herramienta con el comando "\\d".
+  2. Genera y explica la consulta SQL que vas a usar.
+  3. Ejecuta la consulta y muestra los resultados formateados.
+- SEGURIDAD CRÍTICA:
+  1. Si la operación es destructiva (INSERT, UPDATE, DELETE, DROP), **DEBES** pedir confirmación al usuario antes de ejecutar la herramienta.
+  2. Nunca inventes datos; si la consulta falla, explica el error técnico brevemente.
 `;
 
 export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
