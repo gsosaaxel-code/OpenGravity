@@ -9,8 +9,8 @@ export const executePsql = (query: string): string => {
   const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/fastapi_db';
   
   try {
-    // Escaping double quotes in the query for the shell command
-    const sanitizedQuery = query.replace(/"/g, '\\"');
+    // Escaping double quotes and removing newlines in the query for the shell command
+    const sanitizedQuery = query.replace(/"/g, '\\"').replace(/\r?\n|\r/g, ' ');
     const command = `psql "${dbUrl}" -c "${sanitizedQuery}"`;
     
     console.log(`[Tool: PSQL] Executing: ${command}`);
