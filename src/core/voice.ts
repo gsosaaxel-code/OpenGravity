@@ -1,26 +1,20 @@
 import fs from 'fs';
-import path from 'path';
 import { Groq } from 'groq-sdk';
-import textToSpeech from '@google-cloud/text-to-speech';
+import * as googleTTS from 'google-tts-api';
 import axios from 'axios';
 
-// Initialize Groq
+// Initialize Groq (Sigue siendo gratuito en su capa actual)
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Initialize Google TTS
-// It will automatically use GOOGLE_APPLICATION_CREDENTIALS if set,
-// or we can pass some config if needed.
-const ttsClient = new textToSpeech.TextToSpeechClient();
-
 /**
- * Transcribe an audio file using Groq Whisper
+ * Transcribe an audio file using Groq Whisper (STT)
  */
 export const transcribeAudio = async (filePath: string): Promise<string> => {
   try {
     const transcription = await groq.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
       model: 'whisper-large-v3',
-      language: 'es', // Optional, but helps with accuracy
+      language: 'es',
       response_format: 'text',
     });
     return transcription as unknown as string;
@@ -31,32 +25,38 @@ export const transcribeAudio = async (filePath: string): Promise<string> => {
 };
 
 /**
- * Synthesize text to speech using Google Cloud TTS
+ * Synthesize text to speech using Google Translate TTS (FREE / NO KEY)
+ * Handles text longer than 200 characters automatically.
  */
 export const synthesizeSpeech = async (text: string, outputFilePath: string): Promise<void> => {
   try {
-    const request = {
-      input: { text },
-      voice: { languageCode: 'es-US', ssmlGender: 'NEUTRAL' as const, name: 'es-US-Journey-F' },
-      audioConfig: { audioEncoding: 'MP3' as const },
-    };
+    // google-tts-api tiene un límite de 200 caracteres, pero getAllAudioUrls los divide por nosotros
+    const results = googleTTS.getAllAudioUrls(text, {
+      lang: 'es',
+      slow: false,
+      host: 'https://translate.google.com',
+    });
 
-    const [response] = await ttsClient.synthesizeSpeech(request);
-    
-    if (response.audioContent) {
-      fs.writeFileSync(outputFilePath, response.audioContent as Buffer, 'binary');
-      console.log(`🔊 Audio sintetizado guardado en: ${outputFilePath}`);
-    } else {
-        throw new Error('No se generó contenido de audio.');
+    const audioBuffers: Buffer[] = [];
+
+    for (const item of results) {
+      const resp = await axios.get(item.url, { responseType: 'arraybuffer' });
+      audioBuffers.push(Buffer.from(resp.data));
     }
+
+    // Unir todos los buffers en un solo archivo MP3
+    const finalBuffer = Buffer.concat(audioBuffers);
+    fs.writeFileSync(outputFilePath, finalBuffer);
+    
+    console.log(`🔊 Audio gratuito generado en: ${outputFilePath}`);
   } catch (error) {
-    console.error('❌ Error en TTS (Google Cloud):', error);
-    throw new Error('No se pudo generar el audio de respuesta.');
+    console.error('❌ Error en TTS Gratuito:', error);
+    throw new Error('No se pudo generar el audio de respuesta gratuito.');
   }
 };
 
 /**
- * Helper to download a file from a URL
+ * Helper to download a file from a URL (Telegram API)
  */
 export const downloadFile = async (url: string, destPath: string): Promise<void> => {
   const response = await axios({

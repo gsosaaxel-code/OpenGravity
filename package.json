@@ -9,11 +9,11 @@
     "start": "npx tsx src/index.ts"
   },
   "dependencies": {
-    "@google-cloud/text-to-speech": "^6.4.0",
     "axios": "^1.13.6",
     "dotenv": "^16.4.5",
     "firebase-admin": "^13.7.0",
     "form-data": "^4.0.5",
+    "google-tts-api": "^2.0.2",
     "grammy": "^1.32.0",
     "groq-sdk": "^0.12.0"
   },
