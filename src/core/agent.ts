@@ -25,12 +25,12 @@ HABILIDAD SQL (DBA):
 
 REGLAS DE FORMATO OBLIGATORIAS (SIN EXCEPCIÓN):
 Debes presentar cada producto en este esquema exacto:
-Numero. [Modelo] - Color: [Color Traducido o "No especificado"]
+Numero. [Marca] [Modelo] (Si el color existe y no es "-", añade " - Color: [Color Traducido]")
    Precio: $[Precio] [Moneda]
 
 PASOS PARA LA RESPUESTA:
 1. Usa 'execute_psql' para encontrar lo que el usuario pide.
-2. Traduce los colores (White -> Blanco, etc.). Si el color es "-", di "No especificado".
+2. Traduce los colores. Si el color en la base de datos es "-" o está vacío, OMITE la mención al color en esa línea.
 3. Genera la lista limpia. No uses tablas ni asteriscos.
 
 VERACIDAD Y RESULTADOS:
