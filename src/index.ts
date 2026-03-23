@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 dotenv.config();
 
 import { initializeTools } from './tools/index.js';
