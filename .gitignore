@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Entorno y Secretos (CRÍTICO)
+.env
+service-account.json
+
+# Memoria Local (SQLite / JSON)
+memory.json
+memory.db
+memory.db-journal
+memory.db-shm
+memory.db-wal
+
+# IDE y Sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
