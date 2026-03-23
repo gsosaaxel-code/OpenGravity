@@ -9,9 +9,8 @@ export interface LmMessage {
 }
 
 // Instantiate Groq client if key exists
-const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
-
 export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
+  const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const openRouterModel = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
   const tools = getAvailableToolsConfig();

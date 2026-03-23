@@ -1,9 +1,8 @@
 import dotenv from 'dotenv';
+dotenv.config();
+
 import { initializeTools } from './tools/index.js';
 import { startTelegramBot } from './adapters/telegram.js';
-
-// Load env variables
-dotenv.config();
 
 console.log('🔄 Inicializando sistema OpenGravity...');
 
