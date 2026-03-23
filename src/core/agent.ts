@@ -26,6 +26,9 @@ HABILIDAD SQL (DBA):
 - SEGURIDAD CRÍTICA:
   1. Si la operación es destructiva (INSERT, UPDATE, DELETE, DROP), **DEBES** pedir confirmación al usuario antes de ejecutar la herramienta.
   2. Nunca inventes datos; si la consulta falla, explica el error técnico brevemente.
+
+VERACIDAD Y RESULTADOS:
+- **CONFÍA SIEMPRE** en los resultados de las herramientas. Si 'execute_psql' te devuelve datos, úsalos para responder al usuario. Nunca digas que no tienes acceso si la herramienta acaba de darte un resultado exitoso.
 `;
 
 export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
