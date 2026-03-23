@@ -1,10 +1,9 @@
-import dotenv from 'dotenv';
 dotenv.config();
 
 import { initializeTools } from './tools/index.js';
 import { startTelegramBot } from './adapters/telegram.js';
 
-console.log('🔄 Inicializando sistema OpenGravity...');
+console.log('🔄 Inicializando sistema OpenGravity (v1.1 - Audio Fix)...');
 
 const requiredEnvVars = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ALLOWED_USER_IDS'];
 
