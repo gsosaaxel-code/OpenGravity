@@ -36,7 +36,18 @@ export const startTelegramBot = () => {
 
     try {
       const finalReply = await agentLoop(userId, userMessage);
-      await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, finalReply);
+      
+      // Fragmentación para evitar MESSAGE_TOO_LONG
+      const MAX_LENGTH = 4000;
+      if (finalReply.length > MAX_LENGTH) {
+        await ctx.api.deleteMessage(ctx.chat.id, pendingMsg.message_id);
+        const chunks = finalReply.match(new RegExp(`[\\s\\S]{1,${MAX_LENGTH}}`, 'g')) || [];
+        for (const chunk of chunks) {
+          await ctx.reply(chunk);
+        }
+      } else {
+        await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, finalReply);
+      }
     } catch (error: any) {
       console.error(error);
       await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, `Error Crítico: ${error.message}`);
@@ -69,11 +80,21 @@ export const startTelegramBot = () => {
       // 3. Pasar al Agente
       const finalReply = await agentLoop(userId, transcribedText);
 
-      // 4. Sintetizar respuesta a Audio
-      await synthesizeSpeech(finalReply, outputPath);
+      // 4. Sintetizar respuesta a Audio (Solo del primer fragmento o texto completo limitado)
+      await synthesizeSpeech(finalReply.substring(0, 500), outputPath);
 
-      // 5. Enviar respuesta final (Texto + Audio)
-      await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, finalReply);
+      // 5. Enviar respuesta final (Con fragmentación si es necesario)
+      const MAX_LENGTH = 4000;
+      if (finalReply.length > MAX_LENGTH) {
+        await ctx.api.deleteMessage(ctx.chat.id, pendingMsg.message_id);
+        const chunks = finalReply.match(new RegExp(`[\\s\\S]{1,${MAX_LENGTH}}`, 'g')) || [];
+        for (const chunk of chunks) {
+          await ctx.reply(chunk);
+        }
+      } else {
+        await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, finalReply);
+      }
+      
       await ctx.replyWithVoice(new InputFile(outputPath));
 
     } catch (error: any) {
