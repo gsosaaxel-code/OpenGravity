@@ -43,6 +43,15 @@ try {
   });
   
   console.log('✅ OpenGravity está escuchando eventos...');
+
+  // Manejo de cierre limpio para evitar procesos fantasma
+  const shutdown = () => {
+    console.log('\n🛑 Cerrando OpenGravity de forma segura...');
+    server.close();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 } catch (error) {
   console.error('❌ Error fatal al iniciar OpenGravity:', error);
   process.exit(1);
