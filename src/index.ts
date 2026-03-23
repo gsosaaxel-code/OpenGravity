@@ -38,4 +38,3 @@ try {
   console.error('❌ Error fatal al iniciar OpenGravity:', error);
   process.exit(1);
 }
-```
