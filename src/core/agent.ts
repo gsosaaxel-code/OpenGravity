@@ -93,7 +93,14 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     }
 
     // 7. If no tool calls, we are done. Return the text content.
-    return assistantContent || 'No tengo respuesta para eso.';
+    // Clean markdown before returning (Solución definitiva para los asteriscos)
+    const cleanContent = (assistantContent || 'No tengo respuesta para eso.')
+      .replace(/\*\*/g, '') // Remove bold
+      .replace(/\*/g, '')   // Remove italics
+      .replace(/__/g, '')   // Remove alternative bold
+      .replace(/_/g, '');   // Remove alternative italics
+
+    return cleanContent;
   }
 
   return "⚠️ Límite de iteraciones del agente alcanzado sin solución final.";
