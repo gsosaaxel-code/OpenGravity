@@ -9,20 +9,33 @@ const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
 
 let firestore: admin.firestore.Firestore | null = null;
 
-// Initialize Firebase if service-account.json exists
-if (fs.existsSync(serviceAccountPath)) {
+// Initialize Firebase: Priority Env Var > File > Local JSON
+const firebaseConfigEnv = process.env.FIREBASE_CONFIG;
+
+if (firebaseConfigEnv) {
+  try {
+    const serviceAccount = JSON.parse(firebaseConfigEnv);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    firestore = admin.firestore();
+    console.log('☁️ Conectado exitosamente a Firebase Firestore (vía Env Var).');
+  } catch (error) {
+    console.error('❌ Error al parsear FIREBASE_CONFIG desde el entorno:', error);
+  }
+} else if (fs.existsSync(serviceAccountPath)) {
   try {
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
     firestore = admin.firestore();
-    console.log('☁️ Conectado exitosamente a Firebase Firestore.');
+    console.log('☁️ Conectado exitosamente a Firebase Firestore (vía archivo).');
   } catch (error) {
-    console.error('❌ Error al inicializar Firebase. Usando memoria local JSON:', error);
+    console.error('❌ Error al inicializar Firebase desde archivo:', error);
   }
 } else {
-    console.warn('⚠️ No se encontró service-account.json. Usando memoria local JSON.');
+    console.warn('⚠️ No se encontró FIREBASE_CONFIG ni service-account.json. Usando memoria local JSON.');
 }
 
 // --- INTERFACES ---

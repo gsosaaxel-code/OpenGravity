@@ -22,9 +22,20 @@ try {
 
   // 2. Iniciar adaptadores de comunicación
   startTelegramBot();
+
+  // 3. Mini-servidor HTTP para Health Checks (CRÍTICO para Render/Koyeb/HuggingFace)
+  const http = await import('http');
+  const port = process.env.PORT || 8080;
+  http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OpenGravity Agent is ALIVE\n');
+  }).listen(port, () => {
+    console.log(`📡 Servidor de salud escuchando en el puerto ${port}`);
+  });
   
   console.log('✅ OpenGravity está escuchando eventos...');
 } catch (error) {
   console.error('❌ Error fatal al iniciar OpenGravity:', error);
   process.exit(1);
 }
+```
