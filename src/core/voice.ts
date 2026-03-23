@@ -1,9 +1,9 @@
 import fs from 'fs';
 import { Groq } from 'groq-sdk';
-import * as googleTTS from 'google-tts-api';
+import { EdgeTTS } from 'edge-tts-node';
 import axios from 'axios';
 
-// Initialize Groq (Sigue siendo gratuito en su capa actual)
+// Initialize Groq
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
@@ -25,33 +25,25 @@ export const transcribeAudio = async (filePath: string): Promise<string> => {
 };
 
 /**
- * Synthesize text to speech using Google Translate TTS (FREE / NO KEY)
- * Handles text longer than 200 characters automatically.
+ * Synthesize text to speech using Microsoft Edge TTS (FREE / HIGH QUALITY)
+ * No keys required, neural voices.
  */
 export const synthesizeSpeech = async (text: string, outputFilePath: string): Promise<void> => {
   try {
-    // google-tts-api tiene un límite de 200 caracteres, pero getAllAudioUrls los divide por nosotros
-    const results = googleTTS.getAllAudioUrls(text, {
-      lang: 'es',
-      slow: false,
-      host: 'https://translate.google.com',
+    // Usamos una voz neuronal de alta calidad (Dalia es muy natural para español México/Latam)
+    // Otras opciones: es-ES-AlvaroNeural (Hombre), es-ES-ElviraNeural (Mujer España)
+    const tts = new EdgeTTS({
+        voice: 'es-MX-DaliaNeural',
+        lang: 'es-MX',
+        outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
     });
 
-    const audioBuffers: Buffer[] = [];
-
-    for (const item of results) {
-      const resp = await axios.get(item.url, { responseType: 'arraybuffer' });
-      audioBuffers.push(Buffer.from(resp.data));
-    }
-
-    // Unir todos los buffers en un solo archivo MP3
-    const finalBuffer = Buffer.concat(audioBuffers);
-    fs.writeFileSync(outputFilePath, finalBuffer);
+    await tts.saveAudio(outputFilePath, text);
     
-    console.log(`🔊 Audio gratuito generado en: ${outputFilePath}`);
+    console.log(`🔊 Audio neuronal generado con Edge TTS en: ${outputFilePath}`);
   } catch (error) {
-    console.error('❌ Error en TTS Gratuito:', error);
-    throw new Error('No se pudo generar el audio de respuesta gratuito.');
+    console.error('❌ Error en Edge TTS:', error);
+    throw new Error('No se pudo generar el audio de respuesta con la nueva voz.');
   }
 };
 
