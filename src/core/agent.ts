@@ -56,6 +56,7 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     ];
 
     console.log(`[Agent] Iteration ${iteration + 1}: LLM generation initiated...`);
+    console.log(`[Debug] Context size: ${messages.length} messages. Has tool results: ${messages.some(m => m.role === 'tool')}`);
 
     // 3. Call LLM
     const responseMsg = await generateResponse(messages);
