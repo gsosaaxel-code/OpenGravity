@@ -3,14 +3,12 @@ import { Groq } from 'groq-sdk';
 import * as googleTTS from 'google-tts-api';
 import axios from 'axios';
 
-// Initialize Groq
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 /**
  * Transcribe an audio file using Groq Whisper (STT)
  */
 export const transcribeAudio = async (filePath: string): Promise<string> => {
   try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const transcription = await groq.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
       model: 'whisper-large-v3',
