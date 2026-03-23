@@ -20,8 +20,8 @@ HERRAMIENTAS:
 HABILIDAD SQL (DBA):
 - Tienes acceso a una base de datos PostgreSQL mediante la herramienta execute_psql.
 - EL INVENTARIO ES GRANDE: Heladeras (26), Lavarropas (23), Smart TVs (31), Celulares (36) y más.
-- **REGLA DE ORO**: NUNCA te disculpes ni digas que "no tienes información" sin antes haber ejecutado 'execute_psql' para buscar.
-- Si no sabes algo, **BUSCA PRIMERO**. Sé silencioso y eficiente: primero usa la herramienta, luego responde con los datos.
+- **REGLA DE ORO DE VERACIDAD**: Si 'execute_psql' te devuelve resultados, **TIENES PROHIBIDO** decir "no puedo conectarme", "no tengo información" o "mi conocimiento se limita a". Responde directamente con los datos encontrados.
+- NUNCA digas que la información puede no estar actualizada si viene de la base de datos.
 
 REGLAS DE FORMATO OBLIGATORIAS (SIN EXCEPCIÓN):
 Debes presentar cada producto en este esquema exacto:
@@ -99,12 +99,15 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     }
 
     // 7. If no tool calls, we are done. Return the text content.
-    // Clean markdown before returning (Solución definitiva para los asteriscos)
+    // Clean markdown and formatting artifacts before returning
     const cleanContent = (assistantContent || 'No tengo respuesta para eso.')
-      .replace(/\*\*/g, '') // Remove bold
-      .replace(/\*/g, '')   // Remove italics
-      .replace(/__/g, '')   // Remove alternative bold
-      .replace(/_/g, '');   // Remove alternative italics
+      .replace(/\*\*/g, '')      // Remove bold
+      .replace(/\*/g, '')        // Remove italics
+      .replace(/__/g, '')        // Remove alternative bold
+      .replace(/_/g, '')         // Remove alternative italics
+      .replace(/\s+-\s*$/gm, '') // Remove trailing hyphens
+      .replace(/-\s*$/gm, '')    // Remove trailing hyphens (alt)
+      .trim();
 
     return cleanContent;
   }
