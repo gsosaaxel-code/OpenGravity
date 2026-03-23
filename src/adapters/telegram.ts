@@ -8,7 +8,7 @@ import os from 'os';
 export const startTelegramBot = () => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const allowedIdsStr = process.env.TELEGRAM_ALLOWED_USER_IDS || '';
-  
+
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN no encontrado en .env');
   
   const allowedIds = allowedIdsStr.split(',').map(id => id.trim());
@@ -19,7 +19,7 @@ export const startTelegramBot = () => {
     const userId = ctx.from?.id.toString();
     if (!userId || !allowedIds.includes(userId)) {
       console.warn(`Intento de acceso denegado por ID: ${userId}`);
-      return; 
+      return;
     }
     await next();
   });
@@ -63,7 +63,7 @@ export const startTelegramBot = () => {
       // 2. Descargar y Transcribir
       await downloadFile(fileUrl, inputPath);
       const transcribedText = await transcribeAudio(inputPath);
-      
+
       await ctx.api.editMessageText(ctx.chat.id, pendingMsg.message_id, `📝 Has dicho: "${transcribedText}"\n\nProcesando respuesta...`);
 
       // 3. Pasar al Agente
@@ -91,6 +91,6 @@ export const startTelegramBot = () => {
       console.log(`📱 Adaptador Telegram (@${botInfo.username}) iniciado.`);
     }
   });
-  
+
   return bot;
 };
