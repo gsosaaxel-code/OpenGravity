@@ -28,8 +28,8 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   }
 
   if (geminiKey) {
-    payload.model = 'gemini-1.5-flash'; // Forcing Gemini model directly
-    const response = await fetch('https://generativelanguage.googleapis.com/v1/openai/chat/completions', {
+    payload.model = 'gemini-2.5-flash'; // Forcing Gemini model directly (verified in models list)
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${geminiKey}`,
