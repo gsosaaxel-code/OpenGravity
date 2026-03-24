@@ -30,8 +30,14 @@ MAPEO DE EMOJIS:
 
 CONFIGURACIÓN DE DATOS:
 - TABLA: 'inventario_productos'.
+- COLUMNAS VÁLIDAS: id, categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda
 - CATEGORÍAS: 'Celulares', 'Smart TV', 'Tablets', 'Combos', 'Impresoras', 'Consolas', 'Lavarropas', 'Accesorios', 'Secado', 'Heladeras'.
-- MAPEO: "iPhone/Samsung" -> 'Celulares'. "Televisor/TV" -> 'Smart TV'. "Epson/Xerox" -> 'Impresoras'. "Heladera" -> 'Heladeras'. "Leco/Vondom" -> 'Heladeras'.
+- MAPEO: "iPhone/Samsung" -> 'Celulares'. "Televisor/TV" -> 'Smart TV'. "Epson/Xerox" -> 'Impresoras'. "Heladera" -> 'Heladeras'.
+- NUNCA uses columnas 'stock', 'capacidad', 'disponibilidad'. NO EXISTEN.
+
+FLUJO DE COMPRA:
+- Si el usuario quiere COMPRAR un producto, NO llames a execute_psql. Responde directamente:
+  "¡Genial! Para completar tu compra de [producto], te voy a derivar con un asesor. Podés escribirnos por WhatsApp al https://wa.me/message/JFOGCUWX4KKRN1 para coordinar el pago y la entrega. ¡Te esperamos!"
 
 MODO DE RESPUESTA FINAL (PARA VOZ):
 - Responde como si estuviéramos hablando, sin Markdown (** no usar ** ni __).
@@ -109,6 +115,7 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
         if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
           let q = toolCall.function.arguments.query;
           
+          // Capitalize normalizer (Llama 8B fix)
           q = q.replace(/\bMarca\b/g, "marca");
           q = q.replace(/\bModelo\b/g, "modelo");
           q = q.replace(/\bCapacidad\b/g, "capacidad_detalle");
@@ -116,10 +123,19 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
           q = q.replace(/\bCategoria\b/g, "categoria");
           q = q.replace(/inventarioproductos/gi, "inventario_productos");
           
+          // Remove hallucinated columns that don't exist in the DB
+          q = q.replace(/\s*AND\s+stock\s*>\s*\d+/gi, '');
+          q = q.replace(/\s*AND\s+stock\s*=\s*[^\s,)]+/gi, '');
+          q = q.replace(/\s*AND\s+disponibilidad\s*[=><][^\s,)]+/gi, '');
+          q = q.replace(/\bstock\b/gi, 'precio'); // last resort fallback
+          q = q.replace(/\bCapacidad\b\s*(?==|LIKE|>|<)/g, 'capacidad_detalle');
+          
+          // Category translations
           q = q.replace(/'Mobile Phone'|'Smartphone'/gi, "'Celulares'");
           q = q.replace(/'Printer'/gi, "'Impresoras'");
           q = q.replace(/'Fridge'|'Refrigerador'/gi, "'Heladeras'");
           
+          // Color translations
           q = q.replace(/blanco/gi, "White");
           q = q.replace(/negro/gi, "Black");
           q = q.replace(/azul/gi, "Blue");
