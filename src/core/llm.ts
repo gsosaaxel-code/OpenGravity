@@ -90,19 +90,26 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
 
   await sleep(1000);
 
-  // 3. ULTIMATE FALLBACK: GROQ
+  // 3. ULTIMATE FALLBACK: GROQ (WITH MULTI-MODEL CASCADING)
   if (groq) {
-    try {
-      console.log('[LLM] Attempting GROQ (Ultimate Fallback)...');
-      payload.model = 'llama-3.3-70b-versatile';
-      // For Groq, ensure tool_choice is strict to avoid malformed calls
-      if (payload.tools) payload.tool_choice = "auto";
-      const chatCompletion = await groq.chat.completions.create(payload as any);
-      return chatCompletion.choices[0]?.message || { content: '' };
-    } catch (err) {
-      console.error(`[LLM] Groq failed too: ${err}`);
+    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.1-70b-versatile', 'llama3-70b-8192', 'mixtral-8x7b-32768'];
+    for (const model of groqModels) {
+      try {
+        console.log(`[LLM] Attempting GROQ (${model})...`);
+        const subPayload = { ...payload, model };
+        // For Groq, ensure tool_choice is strict to avoid malformed calls
+        if (subPayload.tools) subPayload.tool_choice = "auto";
+        const chatCompletion = await groq.chat.completions.create(subPayload as any);
+        return chatCompletion.choices[0]?.message || { content: '' };
+      } catch (err: any) {
+        if (err.status === 429) {
+          console.warn(`[LLM] Groq ${model} rate limited. Trying next model...`);
+          continue;
+        }
+        console.error(`[LLM] Groq ${model} failed: ${err.message}`);
+      }
     }
   }
 
-  throw new Error('All LLM providers (OpenRouter, Gemini, Groq) failed after retries.');
+  throw new Error('All LLM providers (OpenRouter, Gemini, Groq) exhausted their rates. Please check API keys or wait for refresh.');
 };
