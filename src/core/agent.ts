@@ -129,6 +129,15 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
             q = q.replace(/'Printer'/gi, "'Impresoras'");
             q = q.replace(/'Washing Machine'/gi, "'Lavarropas'");
             
+            // COLOR TRANSLATOR: Maps Spanish requests to English DB values
+            q = q.replace(/blanco/gi, "White");
+            q = q.replace(/negro/gi, "Black");
+            q = q.replace(/azul/gi, "Blue");
+            q = q.replace(/gris|Gris/g, "Gray");
+            q = q.replace(/verde/gi, "Green");
+            q = q.replace(/naranja/gi, "Orange");
+            q = q.replace(/plata|plata/gi, "Silver");
+
             // SECURITY: Ensure query has a LIMIT to avoid overwhelming the model
             if (!q.toLowerCase().includes('limit')) {
               q = q.trim().replace(/;$/, '') + ' LIMIT 20;';
