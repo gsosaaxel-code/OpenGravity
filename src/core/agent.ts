@@ -114,25 +114,31 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
       
       for (const toolCall of assistantMsg.tool_calls) {
         // SQL HEALER: If the model forgot underscores in table/column names, fix it!
-        if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
-          let q = toolCall.function.arguments.query;
-          // Table & Column names
-          q = q.replace(/inventarioproductos/gi, 'inventario_productos');
-          q = q.replace(/capacidaddetalle/gi, 'capacidad_detalle');
-          q = q.replace(/coloradicional/gi, 'color_adicional');
-          // Category translations (English LLMs often hallucinate these)
-          q = q.replace(/'Mobile Phone'/gi, "'Celulares'");
-          q = q.replace(/'Smartphone'/gi, "'Celulares'");
-          q = q.replace(/'Printer'/gi, "'Impresoras'");
-          q = q.replace(/'Washing Machine'/gi, "'Lavarropas'");
-          
-          // Basic check for hallucinated JOIN
-          if (q.toLowerCase().includes('join') || q.toLowerCase().includes('categoriaid')) {
-            console.warn('[Agent] Detected hallucinated JOIN. Fixing query...');
-            q = `SELECT categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda FROM inventario_productos WHERE marca ILIKE '%${currentMessage}%' OR modelo ILIKE '%${currentMessage}%' OR categoria ILIKE '%${currentMessage}%' LIMIT 15;`;
+          // SQL HEALER: If the model forgot underscores or used English categories, fix it!
+          if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
+            let q = toolCall.function.arguments.query;
+            // Table & Column names
+            q = q.replace(/inventarioproductos/gi, 'inventario_productos');
+            q = q.replace(/capacidaddetalle/gi, 'capacidad_detalle');
+            q = q.replace(/coloradicional/gi, 'color_adicional');
+            // Category translations (English LLMs often hallucinate these)
+            q = q.replace(/'Mobile Phone'/gi, "'Celulares'");
+            q = q.replace(/'Smartphone'/gi, "'Celulares'");
+            q = q.replace(/'Printer'/gi, "'Impresoras'");
+            q = q.replace(/'Washing Machine'/gi, "'Lavarropas'");
+            
+            // SECURITY: Ensure query has a LIMIT to avoid overwhelming the model
+            if (!q.toLowerCase().includes('limit')) {
+              q = q.trim().replace(/;$/, '') + ' LIMIT 20;';
+            }
+
+            // Basic check for hallucinated JOIN
+            if (q.toLowerCase().includes('join') || q.toLowerCase().includes('categoriaid')) {
+              console.warn('[Agent] Detected hallucinated JOIN. Fixing query...');
+              q = `SELECT categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda FROM inventario_productos WHERE marca ILIKE '%${currentMessage}%' OR modelo ILIKE '%${currentMessage}%' OR categoria ILIKE '%${currentMessage}%' LIMIT 15;`;
+            }
+            toolCall.function.arguments.query = q;
           }
-          toolCall.function.arguments.query = q;
-        }
 
         const result = await executeTool(toolCall.function.name, toolCall.function.arguments);
         
