@@ -11,6 +11,7 @@ export interface LmMessage {
 // Instantiate Groq client if key exists
 export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+  const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const openRouterModel = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
   const tools = getAvailableToolsConfig();
@@ -26,7 +27,25 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
     payload.tool_choice = "auto";
   }
 
-  if (openRouterKey) {
+  if (geminiKey) {
+    payload.model = 'gemini-2.5-flash'; // Forcing Gemini model directly
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${geminiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message;
+  } else if (openRouterKey) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
