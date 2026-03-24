@@ -65,7 +65,15 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
       }
     }
     
-    throw lastError || new Error('All Gemini models failed.');
+    // ULTIMATE FALLBACK: If Gemini models failed but Groq is available, use it!
+    if (groq) {
+      console.warn('[LLM] All Gemini models failed or reached quota. Falling back to GROQ (Llama 3.3)...');
+      payload.model = 'llama-3.3-70b-versatile';
+      const chatCompletion = await groq.chat.completions.create(payload as any);
+      return chatCompletion.choices[0]?.message || { content: '' };
+    }
+
+    throw lastError || new Error('All Gemini models failed and no Groq backup found.');
   } else if (openRouterKey) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
