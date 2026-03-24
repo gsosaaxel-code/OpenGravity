@@ -173,10 +173,20 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
       continue;
     }
 
-    const cleanContent = (assistantMsg.content || 'Sin respuesta.')
+    let cleanContent = (assistantMsg.content || 'Sin respuesta.')
       .replace(/[\*_]/g, '')
-      .replace(/\s+-\s*$/gm, '') 
+      .replace(/\s+-\s*$/gm, '')
+      // Strip leaked function call syntax from 8B models
+      .replace(/<function=[^>]+>[^<]*<\/function>/gs, '')
+      .replace(/\n?\s*❄️\s*\d+\.\s*<[^>]+>.*?<\/[^>]+>/gs, '')
+      // Strip any line that contains JSON-like SQL artifacts
+      .replace(/\n[^❄️📱📺🖨️🧺🎮📦]*(?:SELECT|FROM|WHERE|inventario)[^\n]*/gi, '')
       .trim();
+
+    // If after cleanup the content is empty or just dots, give a safe fallback
+    if (!cleanContent || cleanContent.length < 5) {
+      cleanContent = "Hubo un problema al generar la respuesta. Por favor, intentá de nuevo.";
+    }
 
     return cleanContent;
   }
