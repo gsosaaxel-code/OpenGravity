@@ -28,7 +28,7 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   }
 
   if (geminiKey) {
-    payload.model = 'gemini-2.5-flash'; // Forcing Gemini model directly
+    payload.model = 'gemini-1.5-flash'; // Stable model for tool use
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {

@@ -46,19 +46,38 @@ VERACIDAD Y RESULTADOS (CERO TOLERANCIA A ALUCINACIONES):
 `;
 
 export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
-  // 1. Save the new user message
-  await saveMessage(userId, { role: 'user', content: currentMessage });
+  // 1. Fetch history once to start the turn
+  const dbHistoryRaw = await getHistory(userId, 30);
+  
+  // Sanitize history to prevent Gemini API Sequence Errors
+  let activeHistory: LmMessage[] = [];
+  let hasReachedFinalAssistant = false;
+  
+  for (let i = dbHistoryRaw.length - 1; i >= 0; i--) {
+    const msg = dbHistoryRaw[i];
+    if (msg.role === 'assistant' && !msg.tool_calls) hasReachedFinalAssistant = true;
+    if (hasReachedFinalAssistant && (msg.role === 'tool' || msg.tool_calls)) continue;
+    activeHistory.unshift(msg);
+  }
+
+  // Strictly start with a user message
+  while (activeHistory.length > 0 && activeHistory[0].role !== 'user') { activeHistory.shift(); }
+  
+  // 2. Add the NEW current message if not already there (getHistory might have it if already saved)
+  const lastMsg = activeHistory[activeHistory.length - 1];
+  if (!lastMsg || lastMsg.content !== currentMessage || lastMsg.role !== 'user') {
+    const userMsg: LmMessage = { role: 'user', content: currentMessage };
+    activeHistory.push(userMsg);
+    await saveMessage(userId, userMsg);
+  }
 
   let iteration = 0;
   
   while (iteration < maxIterations) {
-    // 2. Fetch history (including the newly added message)
-    const dbHistory = await getHistory(userId, 20);
-    
     // Construct actual conversation array for the LLM
     const messages: LmMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT.trim() },
-      ...dbHistory
+      ...activeHistory
     ];
 
     console.log(`[Agent] Iteration ${iteration + 1}: LLM generation initiated...`);
@@ -66,49 +85,42 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
 
     // 3. Call LLM
     const responseMsg = await generateResponse(messages);
-    
-    // Validate output safety
     if(!responseMsg) throw new Error("Recibido un mensaje vacío del LLM");
 
-    // 4. Save LLM response to DB
-    const assistantContent = responseMsg.content || null;
-    const dbEntry: any = {
+    // 4. Record LLM response in BOTH memory and DB
+    const assistantMsg: LmMessage = {
       role: 'assistant',
-      content: assistantContent
+      content: responseMsg.content || null,
+      tool_calls: (responseMsg.tool_calls && responseMsg.tool_calls.length > 0) ? responseMsg.tool_calls : undefined
     };
     
-    // If the LLM decided to use a tool, handle it
-    const hasToolCalls = responseMsg.tool_calls && responseMsg.tool_calls.length > 0;
-    
-    if (hasToolCalls) {
-      dbEntry.tool_calls = responseMsg.tool_calls;
-    }
-
-    await saveMessage(userId, dbEntry);
+    activeHistory.push(assistantMsg);
+    await saveMessage(userId, assistantMsg);
 
     // 5. Check if we need to execute tools
-    if (hasToolCalls) {
-      console.log(`[Agent] Tool execution required (${responseMsg.tool_calls.length} tools)`);
+    if (assistantMsg.tool_calls) {
+      console.log(`[Agent] Tool execution required (${assistantMsg.tool_calls.length} tools)`);
       
-      for (const toolCall of responseMsg.tool_calls) {
+      for (const toolCall of assistantMsg.tool_calls) {
         const result = await executeTool(toolCall.function.name, toolCall.function.arguments);
         
-        // 6. Save the tool result to the DB as a 'tool' message
-        await saveMessage(userId, {
+        const toolMsg: LmMessage = {
           role: 'tool',
           content: result,
           tool_call_id: toolCall.id
-        });
+        };
+        
+        activeHistory.push(toolMsg);
+        await saveMessage(userId, toolMsg);
       }
       
-      // We loop back to let the LLM see the tool responses
       iteration++;
       continue;
     }
 
     // 7. If no tool calls, we are done. Return the text content.
     // Clean markdown and formatting artifacts before returning
-    const cleanContent = (assistantContent || 'No tengo respuesta para eso.')
+    const cleanContent = (assistantMsg.content || 'No tengo respuesta para eso.')
       .replace(/\*\*/g, '')      // Remove bold
       .replace(/\*/g, '')        // Remove italics
       .replace(/__/g, '')        // Remove alternative bold
