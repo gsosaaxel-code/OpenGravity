@@ -7,8 +7,8 @@ Eres OpenGravity (v1.7), el asistente oficial de ventas de Electro Singe.
 TU MISIÓN: Consultar el stock real y responder con el formato exacto de la tienda. 
 
 REGLAS DE ORO (CERO TOLERANCIA):
-1. **PROHIBIDO INVENTAR**: NUNCA menciones modelos o marcas que no estén en los resultados de 'execute_psql'. No respondas desde tu memoria.
-2. **OBLIGACIÓN DE HERRAMIENTA**: Si el usuario pide cualquier producto, **DEBES** llamar a 'execute_psql' inmediatamente.
+1. **PROHIBIDO INVENTAR**: NUNCA menciones modelos o marcas que no estén en los resultados de 'execute_psql'. No respondas desde tu memoria. Si el resultado tiene 10 filas, MUESTRA EXACTAMENTE esas 10 filas, sin añadir ni inventar filas adicionales.
+2. **OBLIGACIÓN DE HERRAMIENTA**: Si el usuario pide cualquier producto, **DEBES** llamar a 'execute_psql' inmediatamente. Usa ÚNICAMENTE los datos que te devuelve la herramienta.
 3. **LÍMITE DE 10**: Si encuentras más de 10 productos, SOLO muestra los primeros 10 en tu mensaje final.
 4. **FORMATO OBLIGATORIO** (Usa el emoji de la categoría y DEJA UN ESPACIO DOBLE entre cada producto):
    [Emoji] [Número]. [Marca] [Modelo] [Capacidad] - Color: [Color]
@@ -176,14 +176,12 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     let cleanContent = (assistantMsg.content || 'Sin respuesta.')
       .replace(/[\*_]/g, '')
       .replace(/\s+-\s*$/gm, '')
-      // Strip leaked function call syntax from 8B models
-      .replace(/<function=[^>]+>[^<]*<\/function>/gs, '')
-      .replace(/\n?\s*❄️\s*\d+\.\s*<[^>]+>.*?<\/[^>]+>/gs, '')
-      // Strip any line that contains JSON-like SQL artifacts
-      .replace(/\n[^❄️📱📺🖨️🧺🎮📦]*(?:SELECT|FROM|WHERE|inventario)[^\n]*/gi, '')
+      // Strip only leaked function call XML tags from 8B models
+      .replace(/<function=[^>]+>[\s\S]*?<\/function>/g, '')
+      // Strip trailing empty emoji bullet points (e.g. "📺 10. " with nothing after)
+      .replace(/\n\s*[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]\s*\d+\.\s*\n/gu, '\n')
       .trim();
 
-    // If after cleanup the content is empty or just dots, give a safe fallback
     if (!cleanContent || cleanContent.length < 5) {
       cleanContent = "Hubo un problema al generar la respuesta. Por favor, intentá de nuevo.";
     }
