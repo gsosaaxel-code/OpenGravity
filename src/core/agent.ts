@@ -175,14 +175,17 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
           .replace(/#VALOR!/gi, 'N/A');
         
         const lines = result.split('\n');
-        // Count only actual data rows (lines with pipe separator, excluding headers/separators)
-        const dataRows = lines.filter(l => l.includes('|') && !l.match(/^[-+]+$/));
+        // Count data rows (lines with '|' but NOT the column header or separator)
+        // Header has 'categoria', separators are all dashes
+        const dataRows = lines.filter(l => 
+          l.includes('|') && !l.match(/^[-\s+|]+$/) && !l.toLowerCase().includes('categoria')
+        );
         const totalCount = dataRows.length;
         if (totalCount > 10) {
-          // Show 13 data lines to model + header, and append the real total
-          const headerLines = lines.slice(0, 3); // column header rows
-          const firstDataRows = dataRows.slice(0, 13);
-          result = [...headerLines, ...firstDataRows].join('\n') + `\n(Total de ${totalCount} productos encontrados)`;
+          // Put total FIRST so the model reads it before anything else
+          const firstDataRows = dataRows.slice(0, 12);
+          result = `[TOTAL_REAL: ${totalCount} productos en esta categoría]\n` + firstDataRows.join('\n');
+
         }
 
 
