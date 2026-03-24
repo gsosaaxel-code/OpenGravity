@@ -27,16 +27,41 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
     payload.tool_choice = "auto";
   }
 
+  // --- NEW TRIAGE ORDER: 1. OpenRouter -> 2. Gemini -> 3. Groq ---
+  
+  // 1. TRY OPENROUTER
+  if (openRouterKey) {
+    try {
+      console.log('[LLM] Attempting OpenRouter...');
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openRouterKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.choices[0].message;
+      }
+      
+      const errorText = await response.text();
+      console.warn(`[LLM] OpenRouter failed (${response.status}): ${errorText}. Sliding to Gemini...`);
+    } catch (err) {
+      console.warn(`[LLM] OpenRouter error: ${err}. Sliding to Gemini...`);
+    }
+  }
+
+  // 2. TRY GEMINI (WITH INTERNAL FALLBACKS)
   if (geminiKey) {
     const geminiModels = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-pro-latest', 'gemini-flash-latest'];
-    let lastError: any = null;
-
     for (const model of geminiModels) {
       try {
         payload.model = model;
-        console.log(`[LLM] Trying Gemini model: ${model}...`);
-        
-        let response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+        console.log(`[LLM] Attempting Gemini (${model})...`);
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${geminiKey}`,
@@ -45,58 +70,29 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
           body: JSON.stringify(payload)
         });
 
-        if (response.status === 429 || response.status === 403 || response.status === 404) {
-          const errorText = await response.text();
-          console.warn(`[LLM] Model ${model} failed (${response.status}). Trying fallback...`);
-          lastError = new Error(`Gemini API Error (${model}): ${response.status} - ${errorText}`);
-          continue; // Try next model
+        if (response.ok) {
+          const data = await response.json();
+          return data.choices[0].message;
         }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-        return data.choices[0].message;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[LLM] Error with model ${model}: ${err.message}. Trying fallback...`);
+        
+        console.warn(`[LLM] Gemini ${model} failed (${response.status}). Trying next Gemini or Groq...`);
+      } catch (err) {
+        console.warn(`[LLM] Gemini ${model} error: ${err}.`);
       }
     }
-    
-    // ULTIMATE FALLBACK: If Gemini models failed but Groq is available, use it!
-    if (groq) {
-      console.warn('[LLM] All Gemini models failed or reached quota. Falling back to GROQ (Llama 3.3)...');
+  }
+
+  // 3. ULTIMATE FALLBACK: GROQ
+  if (groq) {
+    try {
+      console.log('[LLM] Attempting GROQ (Ultimate Fallback)...');
       payload.model = 'llama-3.3-70b-versatile';
       const chatCompletion = await groq.chat.completions.create(payload as any);
       return chatCompletion.choices[0]?.message || { content: '' };
+    } catch (err) {
+      console.error(`[LLM] Groq failed too: ${err}`);
     }
-
-    throw lastError || new Error('All Gemini models failed and no Groq backup found.');
-  } else if (openRouterKey) {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API Error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    return data.choices[0].message; // returns full message object containing content and tool_calls
-  } else if (groq) {
-    payload.model = 'llama-3.3-70b-versatile';
-    
-    const chatCompletion = await groq.chat.completions.create(payload as any);
-    return chatCompletion.choices[0]?.message || { content: '' };
-  } else {
-    throw new Error('No LLM API keys configured. Set GROQ_API_KEY or OPENROUTER_API_KEY.');
   }
+
+  throw new Error('All LLM providers (OpenRouter, Gemini, Groq) failed or are not configured.');
 };
