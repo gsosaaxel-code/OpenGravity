@@ -45,8 +45,10 @@ CONFIGURACION DE DATOS:
 - NUNCA uses columnas 'stock', 'capacidad', 'disponibilidad'. NO EXISTEN.
 
 CONTEO REAL:
-- Cuando el resultado de la herramienta tenga más de 10 filas, el sistema agregará al final: "(Total de X productos encontrados)".
-- USA ese número X en tu mensaje inicial: "Tengo un total de X en stock..."
+- El sistema te enviará un bloque como 'STOCK_TOTAL_REAL = X'.
+- USA SIEMPRE ESE NÚMERO X para tu mensaje: "Tengo un total de X productos...".
+- NUNCA cuentes las filas tú mismo (ya que solo verás una muestra de 10).
+- Si el número es 31, di 31.
 
 FLUJO DE VENTA (MUY IMPORTANTE - sigue estos pasos en orden):
 PASO 1 - CATÁLOGO: Cuando el cliente pide una categoría, ejecuta execute_psql y muestra los primeros 10 productos.
@@ -182,11 +184,13 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
         );
         const totalCount = dataRows.length;
         if (totalCount > 10) {
-          // Put total FIRST so the model reads it before anything else
-          const firstDataRows = dataRows.slice(0, 12);
-          result = `[TOTAL_REAL: ${totalCount} productos en esta categoría]\n` + firstDataRows.join('\n');
-
+          // Put total FIRST and make it impossible to miss
+          const firstDataRows = dataRows.slice(0, 10);
+          result = `### !!! AVISO IMPORTANTE: STOCK_TOTAL_REAL = ${totalCount} !!! ###\n` + 
+                   `[No cuentes las filas, usa el número ${totalCount}]\n` +
+                   firstDataRows.join('\n');
         }
+
 
 
         const toolMsg: LmMessage = {
