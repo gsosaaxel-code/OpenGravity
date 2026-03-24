@@ -50,7 +50,7 @@ VERACIDAD Y RESULTADOS (CERO TOLERANCIA A ALUCINACIONES):
 DECISIVIDAD: No entres en bucles infinitos de búsqueda. Si ya encontraste productos que responden a la duda del usuario, responde INMEDIATAMENTE. No busques más si ya tienes información útil.
 `;
 
-export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 10): Promise<string> => {
+export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
   // 1. Fetch history once to start the turn
   const dbHistoryRaw = await getHistory(userId, 30);
   
