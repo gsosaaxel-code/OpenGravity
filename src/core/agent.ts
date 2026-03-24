@@ -46,9 +46,11 @@ VERACIDAD Y RESULTADOS (CERO TOLERANCIA A ALUCINACIONES):
 - Si la base de datos no tiene algo, di la verdad: "En este momento no tengo stock de ese producto en mi base de datos". NINGÚN PRODUCTO puede salir de tu memoria general.
 - CONFÍA SIEMPRE en los resultados de las herramientas. Si execute_psql te devuelve datos, úsalos tal cual, sin alterar nada.
 - PROHIBIDO EL USO DE MARKDOWN EN LA RESPUESTA FINAL.
+
+DECISIVIDAD: No entres en bucles infinitos de búsqueda. Si ya encontraste productos que responden a la duda del usuario, responde INMEDIATAMENTE. No busques más si ya tienes información útil.
 `;
 
-export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
+export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 10): Promise<string> => {
   // 1. Fetch history once to start the turn
   const dbHistoryRaw = await getHistory(userId, 30);
   
