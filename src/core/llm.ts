@@ -28,8 +28,9 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   }
 
   if (geminiKey) {
-    payload.model = 'gemini-2.5-flash'; // Forcing Gemini model directly (verified in models list)
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+    payload.model = 'gemini-1.5-flash'; // Switching to 1.5-flash which has higher daily quotas (1500 RPD)
+    
+    let response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${geminiKey}`,
@@ -38,6 +39,20 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
       body: JSON.stringify(payload)
     });
     
+    if (response.status === 429) {
+      console.warn('⚠️ Gemini Rate Limit hit. Waiting 60 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 60000));
+      // Retry once
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${geminiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
