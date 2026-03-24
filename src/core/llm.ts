@@ -27,6 +27,9 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
     payload.tool_choice = "auto";
   }
 
+  // Helper to wait between attempts if needed
+  const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+
   // --- NEW TRIAGE ORDER: 1. OpenRouter -> 2. Gemini -> 3. Groq ---
   
   // 1. TRY OPENROUTER
@@ -48,11 +51,13 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
       }
       
       const errorText = await response.text();
-      console.warn(`[LLM] OpenRouter failed (${response.status}): ${errorText}. Sliding to Gemini...`);
+      console.warn(`[LLM] OpenRouter failed (${response.status}). Sliding to Gemini in 1s...`);
     } catch (err) {
       console.warn(`[LLM] OpenRouter error: ${err}. Sliding to Gemini...`);
     }
   }
+
+  await sleep(1000);
 
   // 2. TRY GEMINI (WITH INTERNAL FALLBACKS)
   if (geminiKey) {
@@ -75,18 +80,23 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
           return data.choices[0].message;
         }
         
-        console.warn(`[LLM] Gemini ${model} failed (${response.status}). Trying next Gemini or Groq...`);
+        console.warn(`[LLM] Gemini ${model} failed (${response.status}). Trying next...`);
+        await sleep(500); 
       } catch (err) {
         console.warn(`[LLM] Gemini ${model} error: ${err}.`);
       }
     }
   }
 
+  await sleep(1000);
+
   // 3. ULTIMATE FALLBACK: GROQ
   if (groq) {
     try {
       console.log('[LLM] Attempting GROQ (Ultimate Fallback)...');
       payload.model = 'llama-3.3-70b-versatile';
+      // For Groq, ensure tool_choice is strict to avoid malformed calls
+      if (payload.tools) payload.tool_choice = "auto";
       const chatCompletion = await groq.chat.completions.create(payload as any);
       return chatCompletion.choices[0]?.message || { content: '' };
     } catch (err) {
@@ -94,5 +104,5 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
     }
   }
 
-  throw new Error('All LLM providers (OpenRouter, Gemini, Groq) failed or are not configured.');
+  throw new Error('All LLM providers (OpenRouter, Gemini, Groq) failed after retries.');
 };

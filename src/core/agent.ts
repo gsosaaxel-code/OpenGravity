@@ -26,17 +26,13 @@ MODO DE RESPUESTA FINAL (PARA VOZ):
 " (Asegúrate de dejar ese DOBLE SALTO DE LÍNEA antes del primer producto).
 - FILTRO: NUNCA muestres productos con precio 0.
 
-EJEMPLO DE EJECUCIÓN CORRECTA:
-User: "¿Qué celulares tenés?"
-Assistant (Tool Call): execute_psql(query: "SELECT ... FROM inventario_productos WHERE categoria = 'Celulares' AND precio > 0 LIMIT 10;")
-Tool Result: [Datos de 35 celulares]
-Assistant (Final Response): "Tengo un total de 35 celulares en stock, aquí tienes una muestra de los mejores 10:
-📱 1. Apple iPhone 15 128GB - Color: Blue
-   Precio: $645 USD
+EJEMPLO DE FLUJO:
+1. User pide productos.
+2. Llamas a la herramienta 'execute_psql' con el SQL correcto.
+3. El sistema te devuelve los datos.
+4. Respondes al usuario con el formato de la tienda.
 
-📱 2. Apple iPhone 16 128GB - Color: Teal
-   Precio: $770 USD
-..."
+NUNCA respondas con el nombre de la función como texto. Usa siempre el sistema de herramientas del chat.
 `;
 
 export const agentLoop = async (userId: string, currentMessage: string, maxIterations: number = 5): Promise<string> => {
