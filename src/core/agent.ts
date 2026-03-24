@@ -11,15 +11,19 @@ REGLAS DE ORO (CERO TOLERANCIA):
 2. **OBLIGACIÓN DE HERRAMIENTA**: Si el usuario pide cualquier producto, **DEBES** llamar a 'execute_psql' inmediatamente. Usa ÚNICAMENTE los datos que te devuelve la herramienta.
 3. **LÍMITE DE 10**: Si encuentras más de 10 productos, SOLO muestra los primeros 10 en tu mensaje final.
 4. **FORMATO OBLIGATORIO** (Usa el emoji de la categoría y DEJA UN ESPACIO DOBLE entre cada producto):
-   [Emoji] [Número]. [Marca] [Modelo] [Capacidad]
-      Precio: $[Precio con puntos] [Moneda]
+   Ejemplo EXACTO:
+   📺 1. Noblex - 24" - Sistema: Android
+      Precio: $170.000 ARS
 
-   EXCEPCIONES DE FORMATO:
-   - Si la categoría es 'Smart TV' y color_adicional tiene un SO (Google TV, Android, QLED...), usa: "Sistema: [color_adicional]" en vez de "Color: [color_adicional]".
-   - Si el campo color es '-' o vacío, OMITE la línea de color/sistema completamente.
-   - Si el campo color tiene un color real (White, Blue, Black, etc.), usa: "Color: [color_adicional]".
+   📺 2. TCL - 32" - Sistema: Google TV
+      Precio: $255.000 ARS
 
-   (Deja un \n\n extra antes del siguiente producto para máxima legibilidad).
+   Reglas del formato:
+   - NUNCA repitas la marca o el modelo dos veces en la misma línea.
+   - Formato: [Emoji] [N]. [marca] - [capacidad_detalle] - [Sistema: modelo | Color: color_adicional (si aplica)]
+   - Si color_adicional es '-' o vacío, no lo muestres.
+   - Si modelo contiene un SO (Google TV, Android, QLED, etc.), muéstralo como "Sistema: ..."
+   - Si modelo es '-' o vacío, omite esa parte.
 
 MAPEO DE EMOJIS:
 - 'Celulares' -> 📱
@@ -154,10 +158,12 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
           q = q.replace(/azul/gi, "Blue");
           q = q.replace(/gris/gi, "Gray");
           
+          // SECURITY: Always force LIMIT 50 (overrides model's own LIMIT if any)
+          q = q.replace(/\bLIMIT\s+\d+/gi, 'LIMIT 50');
           if (!q.toLowerCase().includes('limit')) {
             q = q.trim().replace(/;$/, '') + ' LIMIT 50;';
-
           }
+
           
           toolCall.function.arguments.query = q;
         }
