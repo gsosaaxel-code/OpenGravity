@@ -28,7 +28,7 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   }
 
   if (geminiKey) {
-    payload.model = 'gemini-1.5-flash'; // Switching to 1.5-flash which has higher daily quotas (1500 RPD)
+    payload.model = 'gemini-2.0-flash'; // Switching to 2.0-flash which should have higher quota in this tier
     
     let response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
