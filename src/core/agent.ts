@@ -19,10 +19,11 @@ HERRAMIENTAS:
 
 HABILIDAD SQL (DBA):
 - Tienes acceso a una base de datos PostgreSQL mediante la herramienta 'execute_psql'.
-- **TABLA ÚNICA**: 'inventario_productos' (NUNCA uses 'products' ni 'inventario').
-- **COLUMNAS**: (categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda).
-- **MAPEO DE CATEGORÍAS**: Si el usuario pregunta por "televisor", "TV" o "televisores", **DEBES** mapearlo a la categoría 'Smart TV' al buscar en SQL.
-- **ASISTENCIA ENFOCADA**: Ofrece ayuda proactiva (fotos, reserva) **ÚNICAMENTE** sobre el tipo de producto que el usuario está consultando. Si pregunta por TVs, NO menciones heladeras.
+- **ÚNICA TABLA**: 'inventario_productos' (Con guiones bajos). **PROHIBIDO** usar 'products', 'inventario' o 'categorias'.
+- **SIN JOINS**: No existe ninguna otra tabla. No uses INNER JOIN, LEFT JOIN, etc. Todo está en una sola tabla.
+- **COLUMNAS REALES**: (categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda). Nombres EN ESPAÑOL con _.
+- **MAPEO DE CATEGORÍAS**: Si el usuario pregunta por "televisor", "TV" o "televisores", **DEBES** mapearlo a la categoría 'Smart TV'.
+- **ASISTENCIA ENFOCADA**: Ofrece ayuda proactiva (fotos, reserva) **ÚNICAMENTE** sobre el tipo de producto que el usuario está consultando.
 
 REGLAS DE FORMATO OBLIGATORIAS (SIN EXCEPCIÓN):
 Debes presentar cada producto en este esquema exacto, añadiendo un ÚNICO emoji de la categoría al inicio y dejando un DOBLE SALTO DE LÍNEA entre cada producto:
@@ -86,27 +87,57 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     ];
 
     console.log(`[Agent] Iteration ${iteration + 1}: LLM generation initiated...`);
-    console.log(`[Debug] Context size: ${messages.length} messages. Has tool results: ${messages.some(m => m.role === 'tool')}`);
-
+    
     // 3. Call LLM
     const responseMsg = await generateResponse(messages);
     if(!responseMsg) throw new Error("Recibido un mensaje vacío del LLM");
 
-    // 4. Record LLM response in BOTH memory and DB
+    // FALLBACK: Detect if LLM sent tool calls as JSON string in content (common in some Llama versions)
+    let toolCalls = responseMsg.tool_calls;
+    if (!toolCalls && responseMsg.content?.trim().startsWith('[{')) {
+      try {
+        const potentialJson = responseMsg.content.trim();
+        const parsed = JSON.parse(potentialJson);
+        if (Array.isArray(parsed) && parsed[0].name) {
+          toolCalls = parsed.map((tc: any) => ({
+            id: `call_${Math.random().toString(36).substring(7)}`,
+            type: 'function',
+            function: tc
+          }));
+          console.log('[Agent] Detected and recovered JSON tool calls from text content.');
+        }
+      } catch (e) { /* Not valid tool call JSON */ }
+    }
+
+    // 4. Record Assistant response
     const assistantMsg: LmMessage = {
       role: 'assistant',
-      content: responseMsg.content || null,
-      tool_calls: (responseMsg.tool_calls && responseMsg.tool_calls.length > 0) ? responseMsg.tool_calls : undefined
+      content: toolCalls ? null : responseMsg.content,
+      tool_calls: (toolCalls && toolCalls.length > 0) ? toolCalls : undefined
     };
     
     activeHistory.push(assistantMsg);
     await saveMessage(userId, assistantMsg);
 
-    // 5. Check if we need to execute tools
+    // 5. Tool execution loop
     if (assistantMsg.tool_calls) {
       console.log(`[Agent] Tool execution required (${assistantMsg.tool_calls.length} tools)`);
       
       for (const toolCall of assistantMsg.tool_calls) {
+        // SQL HEALER: If the model forgot underscores in table/column names, fix it!
+        if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
+          let q = toolCall.function.arguments.query;
+          q = q.replace(/inventarioproductos/gi, 'inventario_productos');
+          q = q.replace(/capacidaddetalle/gi, 'capacidad_detalle');
+          q = q.replace(/coloradicional/gi, 'color_adicional');
+          // Basic check for hallucinated JOIN
+          if (q.toLowerCase().includes('join') || q.toLowerCase().includes('categoriaid')) {
+            console.warn('[Agent] Detected hallucinated JOIN. Fixing query...');
+            q = `SELECT categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda FROM inventario_productos WHERE marca ILIKE '%${currentMessage}%' OR modelo ILIKE '%${currentMessage}%' OR categoria ILIKE '%${currentMessage}%' LIMIT 15;`;
+          }
+          toolCall.function.arguments.query = q;
+        }
+
         const result = await executeTool(toolCall.function.name, toolCall.function.arguments);
         
         const toolMsg: LmMessage = {
