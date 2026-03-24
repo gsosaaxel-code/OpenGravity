@@ -133,9 +133,16 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
         // SQL HEALER: If the model forgot underscores in table/column names, fix it!
         if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
           let q = toolCall.function.arguments.query;
+          // Table & Column names
           q = q.replace(/inventarioproductos/gi, 'inventario_productos');
           q = q.replace(/capacidaddetalle/gi, 'capacidad_detalle');
           q = q.replace(/coloradicional/gi, 'color_adicional');
+          // Category translations (English LLMs often hallucinate these)
+          q = q.replace(/'Mobile Phone'/gi, "'Celulares'");
+          q = q.replace(/'Smartphone'/gi, "'Celulares'");
+          q = q.replace(/'Printer'/gi, "'Impresoras'");
+          q = q.replace(/'Washing Machine'/gi, "'Lavarropas'");
+          
           // Basic check for hallucinated JOIN
           if (q.toLowerCase().includes('join') || q.toLowerCase().includes('categoriaid')) {
             console.warn('[Agent] Detected hallucinated JOIN. Fixing query...');
