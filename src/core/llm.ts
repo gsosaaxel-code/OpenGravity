@@ -28,38 +28,44 @@ export const generateResponse = async (messages: LmMessage[]): Promise<any> => {
   }
 
   if (geminiKey) {
-    payload.model = 'gemini-2.0-flash'; // Switching to 2.0-flash which should have higher quota in this tier
-    
-    let response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${geminiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (response.status === 429) {
-      console.warn('⚠️ Gemini Rate Limit hit. Waiting 60 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 60000));
-      // Retry once
-      response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${geminiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-    }
+    const geminiModels = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-pro-latest', 'gemini-flash-latest'];
+    let lastError: any = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+    for (const model of geminiModels) {
+      try {
+        payload.model = model;
+        console.log(`[LLM] Trying Gemini model: ${model}...`);
+        
+        let response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${geminiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.status === 429 || response.status === 403 || response.status === 404) {
+          const errorText = await response.text();
+          console.warn(`[LLM] Model ${model} failed (${response.status}). Trying fallback...`);
+          lastError = new Error(`Gemini API Error (${model}): ${response.status} - ${errorText}`);
+          continue; // Try next model
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.choices[0].message;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[LLM] Error with model ${model}: ${err.message}. Trying fallback...`);
+      }
     }
     
-    const data = await response.json();
-    return data.choices[0].message;
+    throw lastError || new Error('All Gemini models failed.');
   } else if (openRouterKey) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
