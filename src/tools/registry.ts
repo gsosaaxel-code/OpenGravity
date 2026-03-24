@@ -41,7 +41,8 @@ export const executeTool = async (name: string, argsStr: string): Promise<string
   }
   
   try {
-    const args = argsStr ? JSON.parse(argsStr) : {};
+    // Detect if args are already an object (LLM SDKs often pass it as POJO) or a string
+    const args = (typeof argsStr === 'object') ? argsStr : (argsStr ? JSON.parse(argsStr) : {});
     console.log(`[Tool Execution] ${name} with args:`, args);
     const result = await tool.execute(args);
     console.log(`[Tool Result] ${name}:`, result);
