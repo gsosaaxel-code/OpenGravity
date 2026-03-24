@@ -21,8 +21,9 @@ HABILIDAD SQL (DBA):
 - Tienes acceso a una base de datos PostgreSQL mediante la herramienta 'execute_psql'.
 - **ÚNICA TABLA**: 'inventario_productos' (Con guiones bajos). **PROHIBIDO** usar 'products', 'inventario' o 'categorias'.
 - **SIN JOINS**: No existe ninguna otra tabla. No uses INNER JOIN, LEFT JOIN, etc. Todo está en una sola tabla.
-- **COLUMNAS REALES**: (categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda). Nombres EN ESPAÑOL con _.
-- **MAPEO DE CATEGORÍAS**: Si el usuario pregunta por "televisor", "TV" o "televisores", **DEBES** mapearlo a la categoría 'Smart TV'.
+- **COLUMNAS REALES**: (categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda).
+- **CATEGORÍAS REALES**: 'Smart TV', 'Celulares', 'Tablets', 'Combos', 'Impresoras', 'Consolas', 'Lavarropas', 'Accesorios', 'Secado'.
+- **MAPEO DE IDIOMA**: Si el usuario pide "iPhone" o "celular", usa categoria = 'Celulares'. Si pide "TV", usa 'Smart TV'. Si pide "impresora", usa 'Impresoras'.
 - **ASISTENCIA ENFOCADA**: Ofrece ayuda proactiva (fotos, reserva) **ÚNICAMENTE** sobre el tipo de producto que el usuario está consultando.
 
 REGLAS DE FORMATO OBLIGATORIAS (SIN EXCEPCIÓN):
@@ -92,21 +93,24 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     const responseMsg = await generateResponse(messages);
     if(!responseMsg) throw new Error("Recibido un mensaje vacío del LLM");
 
-    // FALLBACK: Detect if LLM sent tool calls as JSON string in content (common in some Llama versions)
+    // FALLBACK: Detect if LLM sent tool calls as JSON string in content
     let toolCalls = responseMsg.tool_calls;
-    if (!toolCalls && responseMsg.content?.trim().startsWith('[{')) {
-      try {
-        const potentialJson = responseMsg.content.trim();
-        const parsed = JSON.parse(potentialJson);
-        if (Array.isArray(parsed) && parsed[0].name) {
-          toolCalls = parsed.map((tc: any) => ({
-            id: `call_${Math.random().toString(36).substring(7)}`,
-            type: 'function',
-            function: tc
-          }));
-          console.log('[Agent] Detected and recovered JSON tool calls from text content.');
-        }
-      } catch (e) { /* Not valid tool call JSON */ }
+    if (!toolCalls && responseMsg.content) {
+      const jsonStart = responseMsg.content.indexOf('[{');
+      if (jsonStart !== -1) {
+        try {
+          const potentialJson = responseMsg.content.substring(jsonStart).trim();
+          const parsed = JSON.parse(potentialJson);
+          if (Array.isArray(parsed) && (parsed[0].name || parsed[0].function)) {
+            toolCalls = parsed.map((tc: any) => ({
+              id: `call_${Math.random().toString(36).substring(7)}`,
+              type: 'function',
+              function: tc.function || tc
+            }));
+            console.log('[Agent] Detected and recovered JSON tool calls from text content (fallback).');
+          }
+        } catch (e) { /* Not valid JSON */ }
+      }
     }
 
     // 4. Record Assistant response
