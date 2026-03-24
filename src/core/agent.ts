@@ -11,8 +11,13 @@ REGLAS DE ORO (CERO TOLERANCIA):
 2. **OBLIGACIÓN DE HERRAMIENTA**: Si el usuario pide cualquier producto, **DEBES** llamar a 'execute_psql' inmediatamente. Usa ÚNICAMENTE los datos que te devuelve la herramienta.
 3. **LÍMITE DE 10**: Si encuentras más de 10 productos, SOLO muestra los primeros 10 en tu mensaje final.
 4. **FORMATO OBLIGATORIO** (Usa el emoji de la categoría y DEJA UN ESPACIO DOBLE entre cada producto):
-   [Emoji] [Número]. [Marca] [Modelo] [Capacidad] - Color: [Color]
+   [Emoji] [Número]. [Marca] [Modelo] [Capacidad]
       Precio: $[Precio con puntos] [Moneda]
+
+   EXCEPCIONES DE FORMATO:
+   - Si la categoría es 'Smart TV' y color_adicional tiene un SO (Google TV, Android, QLED...), usa: "Sistema: [color_adicional]" en vez de "Color: [color_adicional]".
+   - Si el campo color es '-' o vacío, OMITE la línea de color/sistema completamente.
+   - Si el campo color tiene un color real (White, Blue, Black, etc.), usa: "Color: [color_adicional]".
 
    (Deja un \n\n extra antes del siguiente producto para máxima legibilidad).
 
@@ -28,22 +33,26 @@ MAPEO DE EMOJIS:
 - 'Tablets' -> 📱
 - Otros -> 📦
 
-CONFIGURACIÓN DE DATOS:
+CONFIGURACION DE DATOS:
 - TABLA: 'inventario_productos'.
 - COLUMNAS VÁLIDAS: id, categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda
 - CATEGORÍAS: 'Celulares', 'Smart TV', 'Tablets', 'Combos', 'Impresoras', 'Consolas', 'Lavarropas', 'Accesorios', 'Secado', 'Heladeras'.
 - MAPEO: "iPhone/Samsung" -> 'Celulares'. "Televisor/TV" -> 'Smart TV'. "Epson/Xerox" -> 'Impresoras'. "Heladera" -> 'Heladeras'.
 - NUNCA uses columnas 'stock', 'capacidad', 'disponibilidad'. NO EXISTEN.
 
+CONTEO REAL:
+- Cuando el resultado de la herramienta tenga más de 10 filas, el sistema agregará al final: "(Total de X productos encontrados)".
+- USA ese número X en tu mensaje inicial: "Tengo un total de X en stock..."
+
 FLUJO DE COMPRA:
 - Si el usuario quiere COMPRAR un producto, NO llames a execute_psql. Responde directamente:
   "¡Genial! Para completar tu compra de [producto], te voy a derivar con un asesor. Podés escribirnos por WhatsApp al https://wa.me/message/JFOGCUWX4KKRN1 para coordinar el pago y la entrega. ¡Te esperamos!"
 
-MODO DE RESPUESTA FINAL (PARA VOZ):
-- Responde como si estuviéramos hablando, sin Markdown (** no usar ** ni __).
-- Si hay más de 10 productos, EMPIEZA así: "Tengo un total de [X] productos en stock, aquí tienes una muestra de los mejores 10:
+MODO DE RESPUESTA FINAL:
+- Responde sin Markdown (** no usar ** ni __).
+- Si hay más de 10 productos en los resultados, EMPIEZA así: "Tengo un total de [X] Smart TVs en stock, aquí tienes los primeros 10:
 
-" (Asegúrate de dejar ese DOBLE SALTO DE LÍNEA antes del primer producto).
+"
 - FILTRO: NUNCA muestres productos con precio 0.
 `;
 
@@ -142,7 +151,8 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
           q = q.replace(/gris/gi, "Gray");
           
           if (!q.toLowerCase().includes('limit')) {
-            q = q.trim().replace(/;$/, '') + ' LIMIT 20;';
+            q = q.trim().replace(/;$/, '') + ' LIMIT 50;';
+
           }
           
           toolCall.function.arguments.query = q;
@@ -155,9 +165,16 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
           .replace(/#VALOR!/gi, 'N/A');
         
         const lines = result.split('\n');
-        if (lines.length > 15) {
-          result = lines.slice(0, 12).join('\n') + `\n... (Total de ${lines.length - 2} productos encontrados)`;
+        // Count only actual data rows (lines with pipe separator, excluding headers/separators)
+        const dataRows = lines.filter(l => l.includes('|') && !l.match(/^[-+]+$/));
+        const totalCount = dataRows.length;
+        if (totalCount > 10) {
+          // Show 13 data lines to model + header, and append the real total
+          const headerLines = lines.slice(0, 3); // column header rows
+          const firstDataRows = dataRows.slice(0, 13);
+          result = [...headerLines, ...firstDataRows].join('\n') + `\n(Total de ${totalCount} productos encontrados)`;
         }
+
 
         const toolMsg: LmMessage = {
           role: 'tool',
