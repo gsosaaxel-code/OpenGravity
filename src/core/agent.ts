@@ -140,8 +140,19 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
             toolCall.function.arguments.query = q;
           }
 
-        const result = await executeTool(toolCall.function.name, toolCall.function.arguments);
+        const rawResult = await executeTool(toolCall.function.name, toolCall.function.arguments);
         
+        // SANITIZE & HARD LIMIT: Clean garbage characters and force max 12 rows to the LLM
+        let result = rawResult
+          .replace(/[^\x20-\x7E\sÀ-ÿ]/g, '') // Remove weird characters like ï¿½
+          .replace(/#VALOR!/gi, 'N/A');      // Clean specific Excel/import garbage
+        
+        // HARD LIMIT: If it's a long list, truncate it so the LLM doesn't even see more than 12
+        const lines = result.split('\n');
+        if (lines.length > 15) {
+          result = lines.slice(0, 12).join('\n') + `\n... (Total de ${lines.length - 2} productos encontrados)`;
+        }
+
         const toolMsg: LmMessage = {
           role: 'tool',
           content: result,
