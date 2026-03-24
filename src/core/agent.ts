@@ -16,8 +16,8 @@ REGLAS DE ORO (CERO TOLERANCIA):
 
 CONFIGURACIÓN DE DATOS:
 - TABLA: 'inventario_productos'.
-- CATEGORÍAS: 'Celulares', 'Smart TV', 'Tablets', 'Combos', 'Impresoras', 'Consolas', 'Lavarropas', 'Accesorios', 'Secado'.
-- MAPEO: "iPhone/Samsung" -> 'Celulares'. "Televisor/TV" -> 'Smart TV'. "Epson/Xerox" -> 'Impresoras'. "Heladera" -> 'Secado' (o similar).
+- CATEGORÍAS: 'Celulares', 'Smart TV', 'Tablets', 'Combos', 'Impresoras', 'Consolas', 'Lavarropas', 'Accesorios', 'Secado', 'Heladeras'.
+- MAPEO: "iPhone/Samsung" -> 'Celulares'. "Televisor/TV" -> 'Smart TV'. "Epson/Xerox" -> 'Impresoras'. "Heladera" -> 'Heladeras'.
 
 MODO DE RESPUESTA FINAL (PARA VOZ):
 - Responde como si estuviéramos hablando, sin Markdown (** no usar ** ni __).
@@ -53,7 +53,7 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
   // Strictly start with a user message
   while (activeHistory.length > 0 && activeHistory[0].role !== 'user') { activeHistory.shift(); }
   
-  // 2. Add the NEW current message if not already there (getHistory might have it if already saved)
+  // 2. Add the NEW current message if not already there
   const lastMsg = activeHistory[activeHistory.length - 1];
   if (!lastMsg || lastMsg.content !== currentMessage || lastMsg.role !== 'user') {
     const userMsg: LmMessage = { role: 'user', content: currentMessage };
@@ -64,7 +64,6 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
   let iteration = 0;
   
   while (iteration < maxIterations) {
-    // Construct actual conversation array for the LLM
     const messages: LmMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT.trim() },
       ...activeHistory
@@ -76,7 +75,7 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     const responseMsg = await generateResponse(messages);
     if(!responseMsg) throw new Error("Recibido un mensaje vacío del LLM");
 
-    // FALLBACK: Detect if LLM sent tool calls as JSON string in content
+    // FALLBACK: Detect if LLM sent tool calls as JSON in text
     let toolCalls = responseMsg.tool_calls;
     if (!toolCalls && responseMsg.content) {
       const jsonStart = responseMsg.content.indexOf('[{');
@@ -90,9 +89,9 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
               type: 'function',
               function: tc.function || tc
             }));
-            console.log('[Agent] Detected and recovered JSON tool calls from text content (fallback).');
+            console.log('[Agent] Detected and recovered JSON tool calls from text content.');
           }
-        } catch (e) { /* Not valid JSON */ }
+        } catch (e) { /* ignore */ }
       }
     }
 
@@ -106,55 +105,47 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
     activeHistory.push(assistantMsg);
     await saveMessage(userId, assistantMsg);
 
-    // 5. Tool execution loop
+    // 5. Tool execution flow
     if (assistantMsg.tool_calls) {
       console.log(`[Agent] Tool execution required (${assistantMsg.tool_calls.length} tools)`);
       
       for (const toolCall of assistantMsg.tool_calls) {
-        // SQL HEALER: If the model forgot underscores in table/column names, fix it!
-          // SQL HEALER: If the model forgot underscores or used English categories, fix it!
-          if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
-            let q = toolCall.function.arguments.query;
-            // Table & Column names
-            q = q.replace(/inventarioproductos/gi, 'inventario_productos');
-            q = q.replace(/capacidaddetalle/gi, 'capacidad_detalle');
-            q = q.replace(/coloradicional/gi, 'color_adicional');
-            // Category translations (English LLMs often hallucinate these)
-            q = q.replace(/'Mobile Phone'/gi, "'Celulares'");
-            q = q.replace(/'Smartphone'/gi, "'Celulares'");
-            q = q.replace(/'Printer'/gi, "'Impresoras'");
-            q = q.replace(/'Washing Machine'/gi, "'Lavarropas'");
-            
-            // COLOR TRANSLATOR: Maps Spanish requests to English DB values
-            q = q.replace(/blanco/gi, "White");
-            q = q.replace(/negro/gi, "Black");
-            q = q.replace(/azul/gi, "Blue");
-            q = q.replace(/gris|Gris/g, "Gray");
-            q = q.replace(/verde/gi, "Green");
-            q = q.replace(/naranja/gi, "Orange");
-            q = q.replace(/plata|plata/gi, "Silver");
-
-            // SECURITY: Ensure query has a LIMIT to avoid overwhelming the model
-            if (!q.toLowerCase().includes('limit')) {
-              q = q.trim().replace(/;$/, '') + ' LIMIT 20;';
-            }
-
-            // Basic check for hallucinated JOIN
-            if (q.toLowerCase().includes('join') || q.toLowerCase().includes('categoriaid')) {
-              console.warn('[Agent] Detected hallucinated JOIN. Fixing query...');
-              q = `SELECT categoria, marca, modelo, capacidad_detalle, color_adicional, precio, moneda FROM inventario_productos WHERE marca ILIKE '%${currentMessage}%' OR modelo ILIKE '%${currentMessage}%' OR categoria ILIKE '%${currentMessage}%' LIMIT 15;`;
-            }
-            toolCall.function.arguments.query = q;
+        if (toolCall.function.name === 'execute_psql' && toolCall.function.arguments.query) {
+          let q = toolCall.function.arguments.query;
+          
+          // COLUMN NORMALIZER (Llama 3 fix)
+          q = q.replace(/\bMarca\b/g, "marca");
+          q = q.replace(/\bModelo\b/g, "modelo");
+          q = q.replace(/\bCapacidad\b/g, "capacidad_detalle");
+          q = q.replace(/\bColor\b/g, "color_adicional");
+          q = q.replace(/\bCategoria\b/g, "categoria");
+          
+          // CATEGORY FIXES
+          q = q.replace(/'Mobile Phone'|'Smartphone'/gi, "'Celulares'");
+          q = q.replace(/'Printer'/gi, "'Impresoras'");
+          q = q.replace(/'Fridge'|'Refrigerador'/gi, "'Heladeras'");
+          
+          // COLOR TRANSLATOR
+          q = q.replace(/blanco/gi, "White");
+          q = q.replace(/negro/gi, "Black");
+          q = q.replace(/azul/gi, "Blue");
+          q = q.replace(/gris/gi, "Gray");
+          
+          // SECURITY LIMIT
+          if (!q.toLowerCase().includes('limit')) {
+            q = q.trim().replace(/;$/, '') + ' LIMIT 20;';
           }
+          
+          toolCall.function.arguments.query = q;
+        }
 
         const rawResult = await executeTool(toolCall.function.name, toolCall.function.arguments);
         
-        // SANITIZE & HARD LIMIT: Clean garbage characters and force max 12 rows to the LLM
+        // SANITIZE & HARD LIMIT (12 rows max)
         let result = rawResult
-          .replace(/[^\x20-\x7E\sÀ-ÿ]/g, '') // Remove weird characters like ï¿½
-          .replace(/#VALOR!/gi, 'N/A');      // Clean specific Excel/import garbage
+          .replace(/[^\x20-\x7E\sÀ-ÿ]/g, '') 
+          .replace(/#VALOR!/gi, 'N/A');
         
-        // HARD LIMIT: If it's a long list, truncate it so the LLM doesn't even see more than 12
         const lines = result.split('\n');
         if (lines.length > 15) {
           result = lines.slice(0, 12).join('\n') + `\n... (Total de ${lines.length - 2} productos encontrados)`;
@@ -174,19 +165,14 @@ export const agentLoop = async (userId: string, currentMessage: string, maxItera
       continue;
     }
 
-    // 7. If no tool calls, we are done. Return the text content.
-    // Clean markdown and formatting artifacts before returning
-    const cleanContent = (assistantMsg.content || 'No tengo respuesta para eso.')
-      .replace(/\*\*/g, '')      // Remove bold
-      .replace(/\*/g, '')        // Remove italics
-      .replace(/__/g, '')        // Remove alternative bold
-      .replace(/_/g, '')         // Remove alternative italics
-      .replace(/\s+-\s*$/gm, '') // Remove trailing hyphens
-      .replace(/-\s*$/gm, '')    // Remove trailing hyphens (alt)
+    // 6. Return Clean Response
+    const cleanContent = (assistantMsg.content || 'Sin respuesta.')
+      .replace(/[\*_]/g, '')      // Clear all markdown artifacts
+      .replace(/\s+-\s*$/gm, '') 
       .trim();
 
     return cleanContent;
   }
 
-  return "⚠️ Límite de iteraciones del agente alcanzado sin solución final.";
+  return "⚠️ Límite de iteraciones alcanzado.";
 };
