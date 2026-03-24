@@ -21,7 +21,9 @@ CONFIGURACIÓN DE DATOS:
 
 MODO DE RESPUESTA FINAL (PARA VOZ):
 - Responde como si estuviéramos hablando, sin Markdown (** no usar ** ni __).
-- Si hay más de 10 productos, EMPIEZA así: "Tengo un total de [X] productos en stock, aquí tienes una muestra de los mejores 10:"
+- Si hay más de 10 productos, EMPIEZA así: "Tengo un total de [X] productos en stock, aquí tienes una muestra de los mejores 10:
+
+" (Asegúrate de dejar ese DOBLE SALTO DE LÍNEA antes del primer producto).
 - FILTRO: NUNCA muestres productos con precio 0.
 
 EJEMPLO DE EJECUCIÓN CORRECTA:
